@@ -1,8 +1,14 @@
 name: CI - Go Microservices
 
+permissions:
+  contents: write
+  packages: write
+
 on:
   push:
     branches: [ main ]
+    tags:
+      - "v*.*.*"
   pull_request:
     branches: [ main ]
 
@@ -56,6 +62,7 @@ jobs:
   build:
     needs: test
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -67,3 +74,79 @@ jobs:
         run: |
           echo "Building Docker images for all services"
           docker compose build
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and push create service
+        uses: docker/build-push-action@v5
+        with:
+          context: ./services/create
+          push: true
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/parcial3-create:latest
+            ${{ secrets.DOCKER_USERNAME }}/parcial3-create:${{ github.sha }}
+
+      - name: Build and push read service
+        uses: docker/build-push-action@v5
+        with:
+          context: ./services/read
+          push: true
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/parcial3-read:latest
+            ${{ secrets.DOCKER_USERNAME }}/parcial3-read:${{ github.sha }}
+
+      - name: Build and push update service
+        uses: docker/build-push-action@v5
+        with:
+          context: ./services/update
+          push: true
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/parcial3-update:latest
+            ${{ secrets.DOCKER_USERNAME }}/parcial3-update:${{ github.sha }}
+
+      - name: Build and push delete service
+        uses: docker/build-push-action@v5
+        with:
+          context: ./services/delete
+          push: true
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/parcial3-delete:latest
+            ${{ secrets.DOCKER_USERNAME }}/parcial3-delete:${{ github.sha }}
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Tag and Push images to GHCR
+        run: |
+          echo "📦 Tagging images..."
+          docker tag parcial3-microservicios-create ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/parcial3-create:latest
+          docker tag parcial3-microservicios-read ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/parcial3-read:latest
+          docker tag parcial3-microservicios-update ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/parcial3-update:latest
+          docker tag parcial3-microservicios-delete ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/parcial3-delete:latest
+
+          echo "🚀 Pushing images..."
+          docker push ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/parcial3-create:latest
+          docker push ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/parcial3-read:latest
+          docker push ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/parcial3-update:latest
+          docker push ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/parcial3-delete:latest
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
