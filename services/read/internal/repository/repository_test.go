@@ -21,7 +21,7 @@ func TestFindAllIntegration(t *testing.T) {
 		t.Fatalf("connect err: %v", err)
 	}
 	db := client.Database("parcialdb")
-	repo := NewItemRepository(db)
+	repo := NewMascotaRepository(db)
 	_, err = repo.FindAll(context.Background())
 	if err != nil && err != mongo.ErrNoDocuments {
 		// no fallamos si no hay docs; sólo verificamos que la consulta corra
